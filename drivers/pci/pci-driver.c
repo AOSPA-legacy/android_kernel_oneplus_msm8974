@@ -659,16 +659,7 @@ static int pci_pm_suspend(struct device *dev)
 		goto Fixup;
 	}
 
-	/*
-	 * PCI devices suspended at run time need to be resumed at this point,
-	 * because in general it is necessary to reconfigure them for system
-	 * suspend.  Namely, if the device is supposed to wake up the system
-	 * from the sleep state, we may need to reconfigure it for this purpose.
-	 * In turn, if the device is not supposed to wake up the system from the
-	 * sleep state, we'll have to prevent it from signaling wake-up.
-	 */
-	pm_runtime_resume(dev);
-
+	pci_dev->state_saved = false;
 	if (pm->suspend) {
 		pci_power_t prev = pci_dev->current_state;
 		int error;
@@ -815,14 +806,7 @@ static int pci_pm_freeze(struct device *dev)
 		return 0;
 	}
 
-	/*
-	 * This used to be done in pci_pm_prepare() for all devices and some
-	 * drivers may depend on it, so do it here.  Ideally, runtime-suspended
-	 * devices should not be touched during freeze/thaw transitions,
-	 * however.
-	 */
-	pm_runtime_resume(dev);
-
+	pci_dev->state_saved = false;
 	if (pm->freeze) {
 		int error;
 
@@ -911,9 +895,7 @@ static int pci_pm_poweroff(struct device *dev)
 		goto Fixup;
 	}
 
-	/* The reason to do that is the same as in pci_pm_suspend(). */
-	pm_runtime_resume(dev);
-
+	pci_dev->state_saved = false;
 	if (pm->poweroff) {
 		int error;
 
@@ -1032,6 +1014,7 @@ static int pci_pm_runtime_suspend(struct device *dev)
 	if (!pm || !pm->runtime_suspend)
 		return -ENOSYS;
 
+	pci_dev->state_saved = false;
 	error = pm->runtime_suspend(dev);
 	suspend_report_result(pm->runtime_suspend, error);
 	if (error)
